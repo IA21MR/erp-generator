@@ -5,8 +5,8 @@ import * as p from '@clack/prompts';
 import { randomBytes } from 'node:crypto';
 
 const OPTIONAL_MODULES = [
-  { value: 'organizations', label: 'organizations', hint: '[siempre activo en v0.1.0] multi-tenant + branding' },
-  { value: 'contacts', label: 'contacts', hint: 'Gestión de clientes, proveedores, empleados' },
+  { value: 'organizations', label: 'organizations', hint: 'multi-tenant + branding (provider de TenantContext)' },
+  { value: 'contacts', label: 'contacts', hint: 'Gestión de clientes, proveedores, empleados (requiere organizations)' },
 ];
 
 function randomSecret(bytes = 48) {
@@ -36,7 +36,7 @@ export async function runWizard({ projectName, defaults = false } = {}) {
       jwtSecret: randomSecret(),
       jwtRefreshSecret: randomSecret(),
       runInstall: true,
-      templateTag: 'v0.2.0',
+      templateTag: 'v0.3.0',
     };
   }
 
@@ -48,15 +48,17 @@ export async function runWizard({ projectName, defaults = false } = {}) {
   if (p.isCancel(productName)) throw new Error('Cancelado');
 
   const modules = await p.multiselect({
-    message: 'Módulos opcionales a activar (core incluye auth + users + organizations):',
+    message: 'Módulos opcionales a activar (core: auth + users):',
     options: OPTIONAL_MODULES,
     required: false,
-    initialValues: ['contacts'],
+    initialValues: ['organizations', 'contacts'],
   });
   if (p.isCancel(modules)) throw new Error('Cancelado');
-  // v0.1.0: organizations es obligatorio (users tiene acoplamiento duro con
-  // OrganizationId). Se fuerza si no fue seleccionado.
-  const modulesWithOrg = Array.from(new Set(['organizations', ...modules]));
+  // contacts depende de organizations; si el usuario seleccionó contacts,
+  // forzamos organizations.
+  const modulesResolved = modules.includes('contacts') && !modules.includes('organizations')
+    ? ['organizations', ...modules]
+    : modules;
 
   const dbName = await p.text({
     message: 'Nombre de la base de datos (dev):',
@@ -112,12 +114,12 @@ export async function runWizard({ projectName, defaults = false } = {}) {
   return {
     projectName: name,
     productName: productName || name,
-    modules: modulesWithOrg,
+    modules: modulesResolved,
     db: { name: dbName, port: Number(dbPort), user: dbUser, password: dbPassword },
     ports: { app: Number(appPort), web: Number(webPort) },
     jwtSecret: randomSecret(),
     jwtRefreshSecret: randomSecret(),
     runInstall,
-    templateTag: 'v0.2.0',
+    templateTag: 'v0.3.0',
   };
 }

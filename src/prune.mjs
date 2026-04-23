@@ -27,6 +27,23 @@ export async function pruneModules({ projectDir, activeModules }) {
     }
   }
 
+  // Poda específica para core-only (sin organizations):
+  // los guards/middleware/migración FK son responsabilidad del provider
+  // de tenant (módulo organizations). Sin él, deben removerse.
+  if (!activeModules.includes('organizations')) {
+    const orgProviderArtifacts = [
+      path.join(projectDir, 'app', 'src', 'shared', 'infrastructure', 'guards', 'OrganizationContextGuard.ts'),
+      path.join(projectDir, 'app', 'src', 'shared', 'infrastructure', 'guards', 'ModuleGuard.ts'),
+      path.join(projectDir, 'app', 'src', 'shared', 'infrastructure', 'http', 'OrganizationContextMiddleware.ts'),
+      // La migración que enlaza User <-> Organization se borra; el schema
+      // sin organizations no la necesita y se regenera vía build-schema.
+      path.join(projectDir, 'app', 'prisma', 'migrations', '20260422220000_add_user_organization_id'),
+    ];
+    for (const t of orgProviderArtifacts) {
+      await rm(t, { recursive: true, force: true });
+    }
+  }
+
   // El test unit del plugin-system valida el catálogo completo del template;
   // no tiene sentido en proyectos generados.
   await rm(
