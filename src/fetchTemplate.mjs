@@ -7,7 +7,7 @@ import path from 'node:path';
 
 const DEFAULT_REPO = 'https://github.com/IA21MR/erp-base-template.git';
 
-export async function fetchTemplate({ targetDir, tag = 'v0.1.0', repo = DEFAULT_REPO }) {
+export async function fetchTemplate({ targetDir, tag = 'v0.2.0', repo = DEFAULT_REPO }) {
   // git clone --depth=1 --branch <tag> <repo> <targetDir>
   await execa('git', ['clone', '--depth=1', '--branch', tag, repo, targetDir], {
     stdio: 'ignore',

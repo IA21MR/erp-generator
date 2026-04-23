@@ -36,7 +36,7 @@ export async function runWizard({ projectName, defaults = false } = {}) {
       jwtSecret: randomSecret(),
       jwtRefreshSecret: randomSecret(),
       runInstall: true,
-      templateTag: 'v0.1.0',
+      templateTag: 'v0.2.0',
     };
   }
 
@@ -118,6 +118,6 @@ export async function runWizard({ projectName, defaults = false } = {}) {
     jwtSecret: randomSecret(),
     jwtRefreshSecret: randomSecret(),
     runInstall,
-    templateTag: 'v0.1.0',
+    templateTag: 'v0.2.0',
   };
 }

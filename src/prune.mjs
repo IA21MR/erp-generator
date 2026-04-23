@@ -12,14 +12,32 @@ export async function pruneModules({ projectDir, activeModules }) {
 
   for (const mod of inactive) {
     const targets = [
+      // Backend
       path.join(projectDir, 'app', 'src', 'modules', mod),
       path.join(projectDir, 'app', 'prisma', 'fragments', `${mod}.prisma`),
       path.join(projectDir, 'app', 'prisma', 'permissions', `${mod}.mjs`),
       path.join(projectDir, 'app', 'prisma', 'seeds', `${mod}.seed.mjs`),
       path.join(projectDir, 'app', 'test', `${mod}.e2e-spec.ts`),
+      // Frontend
+      path.join(projectDir, 'web', 'src', 'modules', mod),
+      path.join(projectDir, 'web', 'src', 'app', '(dashboard)', mod),
     ];
     for (const t of targets) {
       await rm(t, { recursive: true, force: true });
     }
   }
+
+  // El test unit del plugin-system valida el catálogo completo del template;
+  // no tiene sentido en proyectos generados.
+  await rm(
+    path.join(
+      projectDir,
+      'app',
+      'src',
+      'shared',
+      'plugin-system',
+      '__tests__',
+    ),
+    { recursive: true, force: true },
+  );
 }

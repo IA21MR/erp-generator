@@ -40,7 +40,7 @@ const options = {
   jwtSecret: randomBytes(48).toString('base64url'),
   jwtRefreshSecret: randomBytes(48).toString('base64url'),
   runInstall,
-  templateTag: 'v0.1.0',
+  templateTag: 'v0.2.0',
 };
 
 console.log(`→ Generando ${projectDir} con modules=[${modules.join(',') || '(core only)'}]`);

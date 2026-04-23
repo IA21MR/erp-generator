@@ -90,9 +90,71 @@ export function getManifest(name: string): ModuleManifest {
   permLines.push('');
   await writeFile(path.join(appDir, 'prisma', 'permissions.mjs'), permLines.join('\n'), 'utf8');
 
+  // 3b. Frontend: web/src/modules.config.ts (espejo del backend).
+  const webDir = path.join(projectDir, 'web');
+  const webModulesConfig = `/**
+ * Lista de módulos opcionales activos en este proyecto (frontend).
+ * Generada por @ia21mr/create-erp.
+ */
+export const ACTIVE_MODULES: ReadonlyArray<string> = [
+${modules.map((m) => `  '${m}',`).join('\n')}
+];
+`;
+  await writeFile(path.join(webDir, 'src', 'modules.config.ts'), webModulesConfig, 'utf8');
+
+  // 3c. Frontend: web/src/shared/plugin-system/manifests.ts — mantener solo
+  //     los manifests de módulos activos (core + opt-in).
+  const activeWithCore = new Set(['auth', 'users', ...modules]);
+  const webManifestsPath = path.join(
+    webDir,
+    'src',
+    'shared',
+    'plugin-system',
+    'manifests.ts',
+  );
+  let manifestsSrc = await readFile(webManifestsPath, 'utf8');
+  const ALL_OPTIONAL_WEB = ['organizations', 'contacts'];
+  for (const mod of ALL_OPTIONAL_WEB) {
+    if (activeWithCore.has(mod)) continue;
+    const pascal = mod.charAt(0).toUpperCase() + mod.slice(1);
+    // Quita el bloque `export const <Pascal>Manifest: ... = { ... };`
+    manifestsSrc = manifestsSrc.replace(
+      new RegExp(`export const ${pascal}Manifest[\\s\\S]*?^};\\s*`, 'm'),
+      '',
+    );
+  }
+  await writeFile(webManifestsPath, manifestsSrc, 'utf8');
+
+  // 3d. Frontend: web/src/shared/plugin-system/ModuleCatalog.ts —
+  //     importar y listar solo los manifests activos.
+  const catalogImports = [];
+  const catalogEntries = [];
+  for (const m of ['auth', 'users', ...modules]) {
+    const pascal = m.charAt(0).toUpperCase() + m.slice(1);
+    catalogImports.push(`  ${pascal}Manifest,`);
+    catalogEntries.push(`  ${pascal}Manifest,`);
+  }
+  const webCatalog = `/**
+ * Catálogo de módulos frontend activos en este proyecto.
+ * Generado por @ia21mr/create-erp.
+ */
+import type { FrontendModuleManifest } from './FrontendModuleManifest';
+import {
+${catalogImports.join('\n')}
+} from './manifests';
+
+export const MODULE_CATALOG: ReadonlyArray<FrontendModuleManifest> = [
+${catalogEntries.join('\n')}
+];
+`;
+  await writeFile(
+    path.join(webDir, 'src', 'shared', 'plugin-system', 'ModuleCatalog.ts'),
+    webCatalog,
+    'utf8',
+  );
+
   // 4. .env
-  const dbUrl = `postgresql://${db.user}:${db.password}@localhost:${db.port}/${db.name}?schema=public`;
-  const env = `# Database
+  const dbUrl = `postgresql://${db.user}:${db.password}@localhost:${db.port}/${db.name}?schema=public`;  const env = `# Database
 POSTGRES_USER=${db.user}
 POSTGRES_PASSWORD=${db.password}
 POSTGRES_DB=${db.name}
