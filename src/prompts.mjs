@@ -36,7 +36,7 @@ export async function runWizard({ projectName, defaults = false } = {}) {
       jwtSecret: randomSecret(),
       jwtRefreshSecret: randomSecret(),
       runInstall: true,
-      templateTag: 'v0.3.0',
+      templateTag: 'v0.4.0-beta',
     };
   }
 
@@ -51,7 +51,7 @@ export async function runWizard({ projectName, defaults = false } = {}) {
     message: 'Módulos opcionales a activar (core: auth + users):',
     options: OPTIONAL_MODULES,
     required: false,
-    initialValues: ['organizations', 'contacts'],
+    initialValues: [],
   });
   if (p.isCancel(modules)) throw new Error('Cancelado');
   // contacts depende de organizations; si el usuario seleccionó contacts,
