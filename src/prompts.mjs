@@ -48,7 +48,7 @@ export async function runWizard({ projectName, defaults = false } = {}) {
   if (p.isCancel(productName)) throw new Error('Cancelado');
 
   const modules = await p.multiselect({
-    message: 'Módulos opcionales a activar (core: auth + users):',
+    message: 'Módulos opcionales a activar (core: auth + users)\n  ↑↓ navegar · Space seleccionar · Enter confirmar (ninguno = core only):',
     options: OPTIONAL_MODULES,
     required: false,
     initialValues: [],
