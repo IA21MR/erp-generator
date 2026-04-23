@@ -218,4 +218,133 @@ Puerto backend: ${ports.app}
 Puerto frontend: ${ports.web}
 `;
   await writeFile(readmePath, readme, 'utf8');
+
+  // 7. app/src/app.module.ts — solo importar plugins de módulos activos.
+  //    El template base hardcodea ContactsPlugin; en proyectos generados
+  //    solo se incluyen los plugins de módulos que realmente existen.
+  const pluginModules = modules.filter((m) => ['contacts'].includes(m));
+  const pluginImports = pluginModules.map((m) => {
+    const pascal = m.charAt(0).toUpperCase() + m.slice(1);
+    return `import { ${pascal}Plugin } from './modules/${m}/plugin/${pascal}Plugin';`;
+  });
+  const pluginRegistrations = pluginModules.map((m) => {
+    const pascal = m.charAt(0).toUpperCase() + m.slice(1);
+    return `    if (activeNames.has('${m}')) {\n      this.pluginRegistry.register(${pascal}Plugin);\n    }`;
+  });
+
+  const appModule = `import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { PrismaModule } from './infrastructure/database/prisma/prisma.module';
+import { DatabaseModule } from './shared/database/database.module';
+import { EventsModule } from './shared/infrastructure/events/Events.module';
+import { PluginEngineModule } from './shared/plugin-system/PluginEngine.Module';
+import { PluginRegistry } from './shared/plugin-system/application/PluginRegistry';
+import { buildModulesFromConfig, resolveActiveManifests } from './shared/plugin-system/application/buildModulesFromConfig';
+import { ACTIVE_MODULES } from './modules.config';
+${pluginImports.length ? pluginImports.join('\n') + '\n' : ''}
+// Infra base siempre presente (no es "módulo de negocio").
+const INFRASTRUCTURE_MODULES = [
+  ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+  DatabaseModule,
+  PrismaModule,
+  EventsModule,
+  PluginEngineModule,
+];
+
+// Módulos de negocio resueltos desde \`modules.config.ts\`.
+const BUSINESS_MODULES = buildModulesFromConfig(ACTIVE_MODULES);
+
+@Module({
+  imports: [...INFRASTRUCTURE_MODULES, ...BUSINESS_MODULES],
+})
+export class AppModule {
+  constructor(private readonly pluginRegistry: PluginRegistry) {
+    const activeNames = new Set(
+      resolveActiveManifests(ACTIVE_MODULES).map((m) => m.name),
+    );
+${pluginRegistrations.length ? pluginRegistrations.join('\n') + '\n' : ''}  }
+}
+`;
+  await writeFile(path.join(appDir, 'src', 'app.module.ts'), appModule, 'utf8');
+
+  // 8. app/prisma/seed.mjs — solo importar seeds de módulos activos.
+  //    La versión del template importa estáticamente organizations y contacts;
+  //    en core-only esos archivos no existen y el import falla al arrancar.
+  const hasOrgs = modules.includes('organizations');
+  const hasContacts = modules.includes('contacts');
+
+  const seedOptionalImports = [];
+  const seedOptionalCalls = [];
+
+  if (hasOrgs) {
+    seedOptionalImports.push(
+      `import {\n  seedOrganizationsPermissions,\n  seedOrganizationsBase,\n  seedOrganizationModules,\n} from './seeds/organizations.seed.mjs';`,
+    );
+    seedOptionalCalls.push(
+      `\n  // 2. Módulo organizations.\n  let orgId = null;\n  await seedOrganizationsPermissions(prisma);\n  const res = await seedOrganizationsBase(prisma);\n  orgId = res.orgId;`,
+    );
+  }
+
+  if (hasContacts) {
+    seedOptionalImports.push(
+      `import {\n  seedContactsPermissions,\n  seedContactsCatalog,\n} from './seeds/contacts.seed.mjs';`,
+    );
+    seedOptionalCalls.push(
+      `\n  // 3. Módulo contacts.\n  await seedContactsPermissions(prisma);\n  await seedContactsCatalog(prisma);`,
+    );
+  }
+
+  const seedOrgModulesBlock = hasOrgs
+    ? `\n  // 6. Habilitar módulos opt-in para la org primaria.\n  if (orgId) {\n    const optionalActive = activeModules.filter((m) => !['auth', 'users', 'organizations'].includes(m));\n    await seedOrganizationModules(prisma, orgId, optionalActive);\n  }`
+    : '';
+
+  const seedSingleTenantAdminBlock = !hasOrgs
+    ? `\n  // Crear admin user en modo single-tenant (sin organizationId).\n  const bcrypt = (await import('bcrypt')).default;\n  const hashedPassword = await bcrypt.hash('admin123', 10);\n  await prisma.user.upsert({\n    where: { email: 'admin@sotek.com' },\n    update: {},\n    create: {\n      name: 'Administrador',\n      email: 'admin@sotek.com',\n      passwordHash: hashedPassword,\n      active: true,\n    },\n  });`
+    : '';
+
+  const seedMjs = `/**
+ * Orquestador de seed.
+ * Generado por @ia21mr/create-erp.
+ *
+ * Módulos activos: ${['auth', 'users', ...modules].join(', ')}
+ */
+import { config } from 'dotenv';
+import { PrismaClient } from '@prisma/client';
+import {
+  seedCore,
+  grantAllPermissionsToAdmin,
+  assignAdminRoleToAdminUser,
+} from './seeds/core.seed.mjs';
+import { resolveActiveModules } from './read-active-modules.mjs';
+${seedOptionalImports.length ? seedOptionalImports.join('\n') + '\n' : ''}
+config();
+const prisma = new PrismaClient();
+
+async function main() {
+  const activeModules = resolveActiveModules();
+  console.log('🌱 Seed iniciado. Módulos activos:', activeModules.join(', '));
+
+  // 1. Core: permisos + roles.
+  await seedCore(prisma, { activeModules });
+${seedSingleTenantAdminBlock}${seedOptionalCalls.join('')}
+
+  // Finalizadores core.
+  await grantAllPermissionsToAdmin(prisma);
+  await assignAdminRoleToAdminUser(prisma);
+${seedOrgModulesBlock}
+
+  console.log('✅ Seed completado.');
+  console.log('👤 admin@sotek.com / admin123 (CAMBIAR EN PRODUCCIÓN)');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Error durante el seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+`;
+  await writeFile(path.join(appDir, 'prisma', 'seed.mjs'), seedMjs, 'utf8');
 }
