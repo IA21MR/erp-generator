@@ -28,13 +28,16 @@ export async function pruneModules({ projectDir, activeModules }) {
   }
 
   // Poda específica para core-only (sin organizations):
-  // los guards/middleware/migración FK son responsabilidad del provider
-  // de tenant (módulo organizations). Sin él, deben removerse.
+  // los guards/middleware/migración FK viven en organizations/infrastructure/
+  // (Fase 0.4.1). Cuando se poda el módulo organizations entero (líneas ~14-19)
+  // esos archivos ya desaparecen. Esta sección queda como referencia explícita.
   if (!activeModules.includes('organizations')) {
     const orgProviderArtifacts = [
-      path.join(projectDir, 'app', 'src', 'shared', 'infrastructure', 'guards', 'OrganizationContextGuard.ts'),
-      path.join(projectDir, 'app', 'src', 'shared', 'infrastructure', 'guards', 'ModuleGuard.ts'),
-      path.join(projectDir, 'app', 'src', 'shared', 'infrastructure', 'http', 'OrganizationContextMiddleware.ts'),
+      // Ya cubiertos por el rm recursivo de app/src/modules/organizations arriba,
+      // pero se dejan por claridad semántica y en caso de cambio futuro.
+      path.join(projectDir, 'app', 'src', 'modules', 'organizations', 'infrastructure', 'guards', 'OrganizationContextGuard.ts'),
+      path.join(projectDir, 'app', 'src', 'modules', 'organizations', 'infrastructure', 'guards', 'ModuleGuard.ts'),
+      path.join(projectDir, 'app', 'src', 'modules', 'organizations', 'infrastructure', 'http', 'OrganizationContextMiddleware.ts'),
       // La migración que enlaza User <-> Organization se borra; el schema
       // sin organizations no la necesita y se regenera vía build-schema.
       path.join(projectDir, 'app', 'prisma', 'migrations', '20260422220000_add_user_organization_id'),
