@@ -21,9 +21,12 @@ export async function finalize({ projectDir, options }) {
 
   // 3. npm install (si el usuario lo pidió).
   if (options.runInstall) {
+    const webDir = path.join(projectDir, 'web');
     await execa('npm', ['install'], { cwd: appDir, stdio: 'inherit', shell: true });
     // Generar Prisma Client.
     await execa('npx', ['prisma', 'generate'], { cwd: appDir, stdio: 'inherit', shell: true });
+    // Instalar dependencias del frontend.
+    await execa('npm', ['install'], { cwd: webDir, stdio: 'inherit', shell: true });
   }
 
   // 4. git init + commit inicial.
