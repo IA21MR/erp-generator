@@ -4,7 +4,7 @@
   "description": "CLI para generar proyectos ERP white-label a partir de erp-base-template",
   "type": "module",
   "bin": {
-    "create-erp": "./src/cli.mjs"
+    "create-erp": "src/cli.mjs"
   },
   "files": [
     "src"
@@ -19,7 +19,12 @@
     "start": "node src/cli.mjs",
     "dev": "node src/cli.mjs"
   },
-  "keywords": ["erp", "nestjs", "scaffold", "generator"],
+  "keywords": [
+    "erp",
+    "nestjs",
+    "scaffold",
+    "generator"
+  ],
   "license": "UNLICENSED",
   "dependencies": {
     "@clack/prompts": "^0.11.0",
